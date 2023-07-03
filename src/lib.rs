@@ -135,17 +135,13 @@ impl Plugin for LaunchpadJI {
                     velocity,
                 } => {
 
-                    let center_note_option = self.channel_voices.into_iter().position(|v| v == Some(note));
-                    match center_note_option {
-                        Some(center_note) => {
+                    let channel_option = self.channel_voices.into_iter().position(|v| v == Some(note));
+                    match channel_option {
+                        Some(channel_index) => {
                             // Free the channel
-                            self.channel_voices[center_note] = None;
+                            self.channel_voices[channel_index] = None;
 
-                            // Update multiplier
-                            // ...
-
-                            // Update all channel pitch bends
-                            // ...
+                            // Stop all notes on channel_index
                         }
                         None => {}
                     }
@@ -155,6 +151,12 @@ impl Plugin for LaunchpadJI {
                         Some(right_note) => {
                             // Update the array of notes that are held down
                             self.right_side_notes[right_note] = false;
+
+                            // Update multiplier
+                            // ...
+
+                            // Update all channel pitch bends
+                            // ...
                         }
                         None => {}
                     }
@@ -178,6 +180,12 @@ impl Plugin for LaunchpadJI {
                             else{
                                 self.top_side_notes[top_note] = false;
                             }
+
+                            // Update multiplier
+                            // ...
+
+                            // Update all channel pitch bends
+                            // ...
                         }
                         None => {}
                     }
