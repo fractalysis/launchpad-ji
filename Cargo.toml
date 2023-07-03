@@ -1,0 +1,12 @@
+[package]
+name = "launchpad_ji"
+version = "0.1.0"
+edition = "2021"
+authors = ["Fraccy"]
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", package = "nih_plug", features = ["assert_process_allocs"] }
