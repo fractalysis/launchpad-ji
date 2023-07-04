@@ -10,3 +10,11 @@ crate-type = ["cdylib"]
 
 [dependencies]
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug", package = "nih_plug", features = ["assert_process_allocs"] }
+vst3-sys = { git = "https://github.com/robbert-vdh/vst3-sys.git", branch = "fix/drop-box-from-raw", optional = true }
+
+[features]
+default = ["vst3"]
+vst3 = ["dep:vst3-sys"]
+
+[workspace]
+members = ["xtask"]

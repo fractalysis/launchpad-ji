@@ -38,6 +38,24 @@ struct LaunchpadJI {
     current_multiplier: f32,
 }
 
+impl LaunchpadJI {
+    fn update_pitch_bend(&mut self, context: &mut impl ProcessContext<Self>){
+        // Update multiplier
+        // ...
+
+        // Update all channel pitch bends
+        // ...
+    }
+
+    fn get_mapped_note(&self, note: u8) -> u8 {
+        return (self.params.base_pitch.value() * LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() as f32).round() as u8;
+    }
+
+    fn get_mapped_pitch_bend(&self, note: u8) -> f32 {
+        return self.params.base_pitch.value() * LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() as f32 - self.get_mapped_note(note) as f32;
+    }
+}
+
 #[derive(Params)]
 struct LaunchpadJIParams {
     #[id = "base_pitch"]
@@ -107,6 +125,27 @@ impl Plugin for LaunchpadJI {
                     match center_note_option {
                         Some(center_note) => {
                             // Assign note to next available channel
+
+                            for (channel_index, channel_option) in self.channel_voices[2 .. 16].iter_mut().enumerate(){
+                                if channel_option.is_none() {
+                                    self.channel_voices[channel_index] = Some(note);
+
+                                    context.send_event(NoteEvent::NoteOn {
+                                        timing,
+                                        voice_id,
+                                        channel: channel_index as u8,
+                                        note: self.get_mapped_note(note),
+                                        velocity,
+                                    });
+
+                                    context.send_event(NoteEvent::MidiPitchBend {
+                                        timing,
+                                        channel: channel_index as u8,
+                                        value: self.get_mapped_pitch_bend(note)
+                                    });
+                                    break;
+                                }  
+                            }
                         }
                         None => {}
                     }
@@ -117,11 +156,7 @@ impl Plugin for LaunchpadJI {
                             // Update the array of notes that are held down
                             self.right_side_notes[right_note] = true;
 
-                            // Update multiplier
-                            // ...
-
-                            // Update all channel pitch bends
-                            // ...
+                            self.update_pitch_bend(context);
                         }
                         None => {}
                     }
@@ -152,11 +187,7 @@ impl Plugin for LaunchpadJI {
                             // Update the array of notes that are held down
                             self.right_side_notes[right_note] = false;
 
-                            // Update multiplier
-                            // ...
-
-                            // Update all channel pitch bends
-                            // ...
+                            self.update_pitch_bend(context);
                         }
                         None => {}
                     }
@@ -181,11 +212,7 @@ impl Plugin for LaunchpadJI {
                                 self.top_side_notes[top_note] = false;
                             }
 
-                            // Update multiplier
-                            // ...
-
-                            // Update all channel pitch bends
-                            // ...
+                            self.update_pitch_bend(context);
                         }
                         None => {}
                     }
