@@ -2,4 +2,7 @@
 An MPE midi effect for the launchpad to play in just intonated tonality
 
 # build
-`cargo xtask bundle launchpad_ji --release`
+```
+rustup default nightly
+rustup run nightly cargo build
+```
