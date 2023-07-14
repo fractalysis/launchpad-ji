@@ -3,7 +3,7 @@ extern crate baseplug;
 use serde::{Deserialize, Serialize};
 use baseplug::event::*;
 use baseplug::*;
-use std::sync::mpsc;
+use smallvec::SmallVec;
 
 
 baseplug::model! {
@@ -30,8 +30,7 @@ struct LaunchpadJI {
     top_side_notes: [bool; 8],
     current_multiplier: f32,
 
-    midi_sender: Sender<Event<LaunchpadJI>>,
-    midi_receiver: Receiver<Event<LaunchpadJI>>
+    midi_queue: SmallVec<[Event<LaunchpadJI>; 16]>,
 }
 
 impl Plugin for LaunchpadJI {
@@ -46,23 +45,26 @@ impl Plugin for LaunchpadJI {
 
     #[inline]
     fn new(_sample_rate: f32, _model: &LaunchpadJIParams) -> Self {
-
-        let (midi_sender, midi_receiver) = channel::<Event<LaunchpadJI>>();
-
+        
         LaunchpadJI {
-            channel_voices: [Some(0); 16],
+            channel_voices: [None; 16],
             right_side_notes: [false; 8],
             top_side_notes: [false; 8],
             current_multiplier: 1.0,
 
-            midi_sender,
-            midi_receiver
+            midi_queue: SmallVec::new(),
         }
     }
 
     // Do nothing to the audio
     #[inline]
     fn process(&mut self, model: &LaunchpadJIParamsProcess, ctx: &mut ProcessContext<Self>) {
+
+        // Send all midi events
+        let enqueue_midi = &mut ctx.enqueue_event;
+        while let Some(event) = self.midi_queue.pop() {
+            enqueue_midi(event);
+        }
 
         let input = &ctx.inputs[0].buffers;
         let output = &mut ctx.outputs[0].buffers;
@@ -138,7 +140,9 @@ impl MidiReceiver for LaunchpadJI {
                 let center_note_option = LAUNCHPAD_ORDER.into_iter().position(|v| v == note);
 
                 match center_note_option {
+                    
                     Some(center_note) => {
+
                         // Assign note to next available channel
                         for (channel_index, channel_option) in self.channel_voices[1 .. 16].iter_mut().enumerate(){
                             if channel_option.is_none() {
@@ -149,7 +153,7 @@ impl MidiReceiver for LaunchpadJI {
                                     frame: 0,
                                     data: Data::Midi([(0x91 + channel_index).try_into().unwrap(), msg[1], msg[2]]),
                                 };
-                                self.midi_sender.send(note_on);
+                                self.midi_queue.push(note_on);
                             }
                         }
 
@@ -182,7 +186,12 @@ impl MidiReceiver for LaunchpadJI {
                         // Free the channel
                         self.channel_voices[channel_index] = None;
 
-                        // Stop all notes on channel_index
+                        // Stop the note on channel_index
+                        let note_off = Event::<LaunchpadJI> {
+                            frame: 0,
+                            data: Data::Midi([(0x80 + channel_index).try_into().unwrap(), note, 0x00])
+                        };
+                        self.midi_queue.push(note_off);
 
                         return;
                     }
