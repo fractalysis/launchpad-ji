@@ -28,7 +28,6 @@ struct LaunchpadJI {
     channel_voices: [Option<u8>; 16],
     right_side_notes: [bool; 8],
     top_side_notes: [bool; 8],
-    current_multiplier: f32,
 
     midi_queue: SmallVec<[Event<LaunchpadJI>; 16]>,
 }
@@ -50,7 +49,6 @@ impl Plugin for LaunchpadJI {
             channel_voices: [None; 16],
             right_side_notes: [false; 8],
             top_side_notes: [false; 8],
-            current_multiplier: 1.0,
 
             midi_queue: SmallVec::new(),
         }
@@ -122,11 +120,25 @@ impl LaunchpadJI {
     }
 
     fn get_mapped_note(&self, note: u8, _model: &LaunchpadJIParamsProcess) -> u8 {
-        return (_model.base_frequency.values.last().unwrap() * LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() as f32).round() as u8;
+        let freq = _model.base_frequency.values.last().unwrap() * LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() as f32;
+        let pitch = 12.0 * (freq/440.0).log2() + 69.0;
+        return pitch.round() as u8;
     }
 
-    fn get_mapped_pitch_bend(&self, note: u8, _model: &LaunchpadJIParamsProcess) -> f32 {
-        return _model.base_frequency.values.last().unwrap() * LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() as f32 - self.get_mapped_note(note, _model) as f32;
+    fn get_mapped_pitch_bend(&self, note: u8, _model: &LaunchpadJIParamsProcess) -> [u8; 2] {
+        let freq = _model.base_frequency.values.last().unwrap() * LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() as f32;
+        let pitch = 12.0 * (freq/440.0).log2() + 69.0;
+        let pitch_bend = pitch - pitch.round();
+        // pitch bend should be (-1, 1)
+
+        // convert to 14 bit midi pitch bend
+        let midi_value = ((pitch_bend + 1.0) * 8191.5) as u16;
+    
+        // Extract the least significant and most significant bytes
+        let lsb = (midi_value & 0x7F) as u8;
+        let msb = ((midi_value >> 7) & 0x7F) as u8;
+
+        [lsb, msb]
     }
 }
 
@@ -151,13 +163,20 @@ impl MidiReceiver for LaunchpadJI {
                                 // Send midi input to channel_index
                                 let note_on = Event::<LaunchpadJI> {
                                     frame: 0,
-                                    data: Data::Midi([(0x91 + channel_index).try_into().unwrap(), msg[1], msg[2]]),
+                                    data: Data::Midi([(0x91 + channel_index).try_into().unwrap(), self.get_mapped_note(note, _model), msg[2]]),
                                 };
                                 self.midi_queue.push(note_on);
+
+                                let pitch_bend_bytes = self.get_mapped_pitch_bend(note, _model);
+                                let pitch_bend = Event::<LaunchpadJI> {
+                                    frame: 0,
+                                    data: Data::Midi([(0xE1 + channel_index).try_into().unwrap(), pitch_bend_bytes[0], pitch_bend_bytes[1]]),
+                                };
+                                self.midi_queue.push(pitch_bend);
+
+                                return;
                             }
                         }
-
-                        return;
                     }
                     None => {}
                 }
@@ -189,7 +208,7 @@ impl MidiReceiver for LaunchpadJI {
                         // Stop the note on channel_index
                         let note_off = Event::<LaunchpadJI> {
                             frame: 0,
-                            data: Data::Midi([(0x80 + channel_index).try_into().unwrap(), note, 0x00])
+                            data: Data::Midi([(0x80 + channel_index).try_into().unwrap(), self.get_mapped_note(note, _model), msg[2]])
                         };
                         self.midi_queue.push(note_off);
 
