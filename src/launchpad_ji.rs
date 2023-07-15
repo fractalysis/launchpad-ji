@@ -3,7 +3,8 @@ extern crate baseplug;
 use serde::{Deserialize, Serialize};
 use baseplug::event::*;
 use baseplug::*;
-use smallvec::SmallVec;
+use ringbuf::Rb;
+use ringbuf::StaticRb;
 
 
 baseplug::model! {
@@ -29,7 +30,7 @@ struct LaunchpadJI {
     right_side_notes: [bool; 8],
     top_side_notes: [bool; 8],
 
-    midi_queue: SmallVec<[Event<LaunchpadJI>; 16]>,
+    midi_queue: StaticRb::<Event<LaunchpadJI>, 32>,
 }
 
 impl Plugin for LaunchpadJI {
@@ -45,13 +46,37 @@ impl Plugin for LaunchpadJI {
     #[inline]
     fn new(_sample_rate: f32, _model: &LaunchpadJIParams) -> Self {
         
-        LaunchpadJI {
+        let mut to_ret = LaunchpadJI {
             channel_voices: [None; 16],
             right_side_notes: [false; 8],
             top_side_notes: [false; 8],
 
-            midi_queue: SmallVec::new(),
-        }
+            midi_queue: StaticRb::default(),
+        };
+
+        // MPE initialization
+
+        to_ret.midi_queue.push(Event::<LaunchpadJI> {
+            frame: 0,
+            data: Data::Midi([0xB0, 0x79, 0x00]),
+        });
+
+        to_ret.midi_queue.push(Event::<LaunchpadJI> {
+            frame: 0,
+            data: Data::Midi([0xB0, 0x64, 0x06]),
+        });
+
+        to_ret.midi_queue.push(Event::<LaunchpadJI> {
+            frame: 0,
+            data: Data::Midi([0xB0, 0x65, 0x00]),
+        });
+
+        to_ret.midi_queue.push(Event::<LaunchpadJI> {
+            frame: 0,
+            data: Data::Midi([0xB0, 0x06, 0x0F]), // 15 (0F) channels
+        });
+
+        to_ret
     }
 
     // Do nothing to the audio

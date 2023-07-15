@@ -8,9 +8,7 @@ license = "MIT"
 [dependencies]
 serde = {version = "^1.0.159", default-features = false}
 baseplug = { git = "https://github.com/wrl/baseplug.git", package = "baseplug" }
-smallvec = "1.11.0"
-log4rs = "1.2.0"
-log = "0.4.19"
+ringbuf = "0.3.3"
 
 [lib]
 name = "launchpad_ji"
