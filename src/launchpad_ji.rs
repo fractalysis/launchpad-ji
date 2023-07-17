@@ -6,6 +6,8 @@ use baseplug::*;
 use ringbuf::Rb;
 use ringbuf::StaticRb;
 
+const MPE_PITCH_BEND_RANGE: f32 = 48.0; // In semitones
+
 
 baseplug::model! {
     #[derive(Debug, Serialize, Deserialize)]
@@ -157,7 +159,7 @@ impl LaunchpadJI {
         // pitch bend should be (-1, 1)
 
         // convert to 14 bit midi pitch bend
-        let midi_value = ((pitch_bend + 1.0) * 8191.5) as u16;
+        let midi_value = ((pitch_bend * 8192.0 / MPE_PITCH_BEND_RANGE) + 8192.0) as u16;
     
         // Extract the least significant and most significant bytes
         let lsb = (midi_value & 0x7F) as u8;
@@ -186,11 +188,6 @@ impl MidiReceiver for LaunchpadJI {
                                 *channel_option = Some(note);
 
                                 // Send midi input to channel_index
-                                let note_on = Event::<LaunchpadJI> {
-                                    frame: 0,
-                                    data: Data::Midi([(0x91 + channel_index).try_into().unwrap(), self.get_mapped_note(note, _model), msg[2]]),
-                                };
-                                self.midi_queue.push(note_on);
 
                                 let pitch_bend_bytes = self.get_mapped_pitch_bend(note, _model);
                                 let pitch_bend = Event::<LaunchpadJI> {
@@ -198,6 +195,12 @@ impl MidiReceiver for LaunchpadJI {
                                     data: Data::Midi([(0xE1 + channel_index).try_into().unwrap(), pitch_bend_bytes[0], pitch_bend_bytes[1]]),
                                 };
                                 self.midi_queue.push(pitch_bend);
+
+                                let note_on = Event::<LaunchpadJI> {
+                                    frame: 0,
+                                    data: Data::Midi([(0x91 + channel_index).try_into().unwrap(), self.get_mapped_note(note, _model), msg[2]]),
+                                };
+                                self.midi_queue.push(note_on);
 
                                 return;
                             }
