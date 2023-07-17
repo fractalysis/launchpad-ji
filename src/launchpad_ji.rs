@@ -28,6 +28,7 @@ impl Default for LaunchpadJIParams {
 }
 
 struct LaunchpadJI {
+    current_multiplier: f32,
     channel_voices: [Option<u8>; 16],
     right_side_notes: [bool; 8],
     top_side_notes: [bool; 8],
@@ -49,6 +50,7 @@ impl Plugin for LaunchpadJI {
     fn new(_sample_rate: f32, _model: &LaunchpadJIParams) -> Self {
         
         let mut to_ret = LaunchpadJI {
+            current_multiplier: 1.,
             channel_voices: [None; 16],
             right_side_notes: [false; 8],
             top_side_notes: [false; 8],
@@ -121,7 +123,7 @@ impl Plugin for LaunchpadJI {
 //  96  97  98  99 100 101 102 103   104
 // 112 113 114 115 116 117 118 119   120
 
-const LAUNCHPAD_ORDER: [u8; 64] = [ // LAUNCHPAD_ORDER[base_pitch_multiplier-1] = note, e.g. LAUNCH_PAD_ORDER[0] = 112 so note 112 will play 1 * the base pitch
+const LAUNCHPAD_ORDER: [u8; 64] = [ // LAUNCHPAD_ORDER[base_pitch_multiplier] = note, e.g. LAUNCH_PAD_ORDER[1] = 113 so note 113 will play 1 * the base pitch
     112, 113, 114, 115, 116, 117, 118, 119,
      96,  97,  98,  99, 100, 101, 102, 103,
      80,  81,  82,  83,  84,  85,  86,  87,
@@ -133,17 +135,44 @@ const LAUNCHPAD_ORDER: [u8; 64] = [ // LAUNCHPAD_ORDER[base_pitch_multiplier-1] 
 ];
 
 const LAUNCHPAD_RIGHT_SIDE: [u8; 8] = [8, 24, 40, 56, 72, 88, 104, 120]; // NOTEON
-const RIGHT_SIDE_MULTIPLIERS: [f32; 8] = [2., 3./2., 4./3., 5./4., 6./5., 7./6., 8./7., 9./8.];
+const RIGHT_SIDE_MULTIPLIERS: [f32; 8] = [9./8., 8./7., 7./6., 6./5., 5./4., 4./3., 3./2., 2.];
 const LAUNCHPAD_TOP_SIDE: [u8; 8] = [104, 105, 106, 107, 108, 109, 110, 111]; // CC
 const TOP_SIDE_MULTIPLIERS: [f32; 8] = [1./2., 2./3., 3./4., 4./5., 5./6., 6./7., 7./8., 8./9.];
 
 impl LaunchpadJI {
-    fn update_pitch_bend(&mut self){
+    fn update_pitch_bend(&mut self, _model: &LaunchpadJIParamsProcess){
+
         // Update multiplier
-        // ...
+        self.current_multiplier = 1.;
+
+        for (index, down) in self.right_side_notes.iter().enumerate() {
+            if *down {
+                self.current_multiplier *= RIGHT_SIDE_MULTIPLIERS[index];
+            }
+        }
+
+        for (index, down) in self.top_side_notes.iter().enumerate() {
+            if *down {
+                self.current_multiplier *= TOP_SIDE_MULTIPLIERS[index];
+            }
+        }
 
         // Update all channel pitch bends
-        // ...
+        for (channel_index, note_option) in self.channel_voices.iter().enumerate() {
+            match note_option {
+                Some(note) => {
+                    let pitch_bend_bytes = self.get_mapped_pitch_bend(*note, _model);
+
+                    let pitch_bend = Event::<LaunchpadJI> {
+                        frame: 0,
+                        data: Data::Midi([(0xE0 + channel_index).try_into().unwrap(), pitch_bend_bytes[0], pitch_bend_bytes[1]]),
+                    };
+                    self.midi_queue.push(pitch_bend);
+                }
+
+                None => {}
+            }
+        }
     }
 
     fn get_mapped_note(&self, note: u8, _model: &LaunchpadJIParamsProcess) -> u8 {
@@ -154,8 +183,8 @@ impl LaunchpadJI {
 
     fn get_mapped_pitch_bend(&self, note: u8, _model: &LaunchpadJIParamsProcess) -> [u8; 2] {
         let freq = _model.base_frequency.values.last().unwrap() * LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() as f32;
-        let pitch = 12.0 * (freq/440.0).log2() + 69.0;
-        let pitch_bend = pitch - pitch.round();
+        let pitch = 12.0 * (freq * self.current_multiplier/440.0).log2() + 69.0;
+        let pitch_bend = pitch - self.get_mapped_note(note, _model) as f32;
         // pitch bend should be (-1, 1)
 
         // convert to 14 bit midi pitch bend
@@ -215,7 +244,7 @@ impl MidiReceiver for LaunchpadJI {
                         // Update the array of notes that are held down
                         self.right_side_notes[right_note] = true;
 
-                        self.update_pitch_bend();
+                        self.update_pitch_bend(_model);
                         
                         return;
                     }
@@ -251,7 +280,7 @@ impl MidiReceiver for LaunchpadJI {
                         // Update the array of notes that are held down
                         self.right_side_notes[right_note] = false;
 
-                        self.update_pitch_bend();
+                        self.update_pitch_bend(_model);
 
                         return;
                     }
@@ -276,7 +305,7 @@ impl MidiReceiver for LaunchpadJI {
                             self.top_side_notes[top_note] = false;
                         }
 
-                        self.update_pitch_bend();
+                        self.update_pitch_bend(_model);
                         
                         return;
                     }
