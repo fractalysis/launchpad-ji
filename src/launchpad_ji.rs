@@ -12,7 +12,7 @@ const MPE_PITCH_BEND_RANGE: f32 = 48.0; // In semitones
 baseplug::model! {
     #[derive(Debug, Serialize, Deserialize)]
     struct LaunchpadJIParams {
-        #[model(min = 20.0, max = 200.0)]
+        #[model(min = 8.0, max = 128.0)]
         #[parameter(name = "Base Frequency",
             gradient = "Power(2.0)")]
         base_frequency: f32,
@@ -22,7 +22,7 @@ baseplug::model! {
 impl Default for LaunchpadJIParams {
     fn default() -> Self {
         Self {
-            base_frequency: 41.2,
+            base_frequency: 20.6, // E
         }
     }
 }
@@ -123,7 +123,7 @@ impl Plugin for LaunchpadJI {
 //  96  97  98  99 100 101 102 103   104
 // 112 113 114 115 116 117 118 119   120
 
-const LAUNCHPAD_ORDER: [u8; 64] = [ // LAUNCHPAD_ORDER[base_pitch_multiplier] = note, e.g. LAUNCH_PAD_ORDER[1] = 113 so note 113 will play 1 * the base pitch
+const LAUNCHPAD_ORDER: [u8; 64] = [ // LAUNCHPAD_ORDER[base_pitch_multiplier-1] = note, e.g. LAUNCH_PAD_ORDER[1-1] = 112 so note 112 will play 1 * the base pitch
     112, 113, 114, 115, 116, 117, 118, 119,
      96,  97,  98,  99, 100, 101, 102, 103,
      80,  81,  82,  83,  84,  85,  86,  87,
@@ -176,13 +176,13 @@ impl LaunchpadJI {
     }
 
     fn get_mapped_note(&self, note: u8, _model: &LaunchpadJIParamsProcess) -> u8 {
-        let freq = _model.base_frequency.values.last().unwrap() * LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() as f32;
+        let freq = _model.base_frequency.values.last().unwrap() * (LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() + 1) as f32;
         let pitch = 12.0 * (freq/440.0).log2() + 69.0;
         return pitch.round() as u8;
     }
 
     fn get_mapped_pitch_bend(&self, note: u8, _model: &LaunchpadJIParamsProcess) -> [u8; 2] {
-        let freq = _model.base_frequency.values.last().unwrap() * LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() as f32;
+        let freq = _model.base_frequency.values.last().unwrap() * (LAUNCHPAD_ORDER.into_iter().position(|v| v == note).unwrap() + 1) as f32;
         let pitch = 12.0 * (freq * self.current_multiplier/440.0).log2() + 69.0;
         let pitch_bend = pitch - self.get_mapped_note(note, _model) as f32;
         // pitch bend should be (-1, 1)
