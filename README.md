@@ -25,6 +25,8 @@ const LAUNCHPAD_RIGHT_SIDE: [u8; 8] = [8, 24, 40, 56, 72, 88, 104, 120]; // NOTE
 const RIGHT_SIDE_MULTIPLIERS: [f32; 8] = [9./8., 8./7., 7./6., 6./5., 5./4., 4./3., 3./2., 2.];
 const LAUNCHPAD_TOP_SIDE: [u8; 8] = [104, 105, 106, 107, 108, 109, 110, 111]; // CC
 const TOP_SIDE_MULTIPLIERS: [f32; 8] = [1./2., 2./3., 3./4., 4./5., 5./6., 6./7., 7./8., 8./9.];
+
+const MPE_PITCH_BEND_RANGE: f32 = 48.0; // In semitones
 ```
 
 To edit these constants for your launchpad, get something to monitor midi (e.g. [this vst](https://plugins4free.com/plugin/1432/)) and play all the notes in the middle square of the launchpad starting with the one you want to be the bottom note and moving up. I started with the bottom left note, which was 112, and then went through the whole row, and went up the rows one at a time. This should fill up `LAUNCHPAD_ORDER` with 64 numbers. `LAUNCHPAD_RIGHT_SIDE` was made by pressing all the right buttons starting from the top and moving down, and `LAUNCHPAD_TOP_SIDE` was made by pressing all the top buttons starting from the left and moving right, although my launchpad treats right notes as NOTEON signals and top notes as CC. If your top buttons are not CC or your right notes are not NOTEON, you will need to change the code.

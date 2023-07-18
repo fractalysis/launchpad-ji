@@ -6,7 +6,39 @@ use baseplug::*;
 use ringbuf::Rb;
 use ringbuf::StaticRb;
 
+
+
+// 104 105 106 107 108 109 110 111 (<- CC)
+//   0   1   2   3   4   5   6   7     8
+//  16  17  18  19  20  21  22  23    24
+//  32  33  34  35  36  37  38  39    40
+//  48  49  50  51  52  53  54  55    56
+//  64  65  66  67  68  69  70  71    72
+//  80  81  82  83  84  85  86  87    88
+//  96  97  98  99 100 101 102 103   104
+// 112 113 114 115 116 117 118 119   120
+
+const LAUNCHPAD_ORDER: [u8; 64] = [ // LAUNCHPAD_ORDER[base_pitch_multiplier-1] = note, e.g. LAUNCH_PAD_ORDER[1-1] = 112 so note 112 will play 1 * the base pitch
+    112, 113, 114, 115, 116, 117, 118, 119,
+     96,  97,  98,  99, 100, 101, 102, 103,
+     80,  81,  82,  83,  84,  85,  86,  87,
+     64,  65,  66,  67,  68,  69,  70,  71,
+     48,  49,  50,  51,  52,  53,  54,  55,
+     32,  33,  34,  35,  36,  37,  38,  39,
+     16,  17,  18,  19,  20,  21,  22,  23,
+      0,   1,   2,   3,   4,   5,   6,   7
+];
+
+const LAUNCHPAD_RIGHT_SIDE: [u8; 8] = [8, 24, 40, 56, 72, 88, 104, 120]; // NOTEON
+const RIGHT_SIDE_MULTIPLIERS: [f32; 8] = [9./8., 8./7., 7./6., 6./5., 5./4., 4./3., 3./2., 2.];
+const LAUNCHPAD_TOP_SIDE: [u8; 8] = [104, 105, 106, 107, 108, 109, 110, 111]; // CC
+const TOP_SIDE_MULTIPLIERS: [f32; 8] = [1./2., 2./3., 3./4., 4./5., 5./6., 6./7., 7./8., 8./9.];
+
 const MPE_PITCH_BEND_RANGE: f32 = 48.0; // In semitones
+
+
+
+// PLUGIN DEFINITION
 
 
 baseplug::model! {
@@ -105,39 +137,8 @@ impl Plugin for LaunchpadJI {
 
 
 
-// USE CASE EXAMPLE (base pitch 41.2):
-// NOTEON 54 -> NOTEON CH2 97 66.632
-// NOTEON 55 -> NOTEON CH3 97 86.632
-// NOTEOFF 54 -> NOTEOFF CH2
-// NOTEON 43 -> NOTEON CH2 43 70.250
-// NOTEOFF 55 -> NOTEOFF CH3
-// NOTEOFF 43 -> NOTEOFF CH2
+// MIDI PROCESSING
 
-
-//   0   1   2   3   4   5   6   7     8
-//  16  17  18  19  20  21  22  23    24
-//  32  33  34  35  36  37  38  39    40
-//  48  49  50  51  52  53  54  55    56
-//  64  65  66  67  68  69  70  71    72
-//  80  81  82  83  84  85  86  87    88
-//  96  97  98  99 100 101 102 103   104
-// 112 113 114 115 116 117 118 119   120
-
-const LAUNCHPAD_ORDER: [u8; 64] = [ // LAUNCHPAD_ORDER[base_pitch_multiplier-1] = note, e.g. LAUNCH_PAD_ORDER[1-1] = 112 so note 112 will play 1 * the base pitch
-    112, 113, 114, 115, 116, 117, 118, 119,
-     96,  97,  98,  99, 100, 101, 102, 103,
-     80,  81,  82,  83,  84,  85,  86,  87,
-     64,  65,  66,  67,  68,  69,  70,  71,
-     48,  49,  50,  51,  52,  53,  54,  55,
-     32,  33,  34,  35,  36,  37,  38,  39,
-     16,  17,  18,  19,  20,  21,  22,  23,
-      0,   1,   2,   3,   4,   5,   6,   7
-];
-
-const LAUNCHPAD_RIGHT_SIDE: [u8; 8] = [8, 24, 40, 56, 72, 88, 104, 120]; // NOTEON
-const RIGHT_SIDE_MULTIPLIERS: [f32; 8] = [9./8., 8./7., 7./6., 6./5., 5./4., 4./3., 3./2., 2.];
-const LAUNCHPAD_TOP_SIDE: [u8; 8] = [104, 105, 106, 107, 108, 109, 110, 111]; // CC
-const TOP_SIDE_MULTIPLIERS: [f32; 8] = [1./2., 2./3., 3./4., 4./5., 5./6., 6./7., 7./8., 8./9.];
 
 impl LaunchpadJI {
     fn update_pitch_bend(&mut self, _model: &LaunchpadJIParamsProcess){
@@ -317,5 +318,7 @@ impl MidiReceiver for LaunchpadJI {
         }
     }
 }
+
+
 
 baseplug::vst2!(LaunchpadJI, b"FRlj");
